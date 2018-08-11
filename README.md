@@ -1,6 +1,6 @@
 # An apache virtual-host manager
 
-This framework allows you easily manage the virtual hosts of the apache webserver.
+This framework allows you to easily manage the virtual hosts from the apache web server.
 
 ## 0. Introduction
 
