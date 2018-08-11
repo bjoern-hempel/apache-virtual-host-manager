@@ -136,18 +136,52 @@ TEMPLATE_APACHE_INCLUDES_GENERAL_ALIAS="ServerAlias %s"
 
 # -----------------------------------------------------------
 #
-# apache include ssl content
+# SSL: apache include ssl content (before)
+#
+# -----------------------------------------------------------
+read -d '' TEMPLATE_APACHE_INCLUDES_SSL_BEFORE <<EndOfMessage
+%s
+
+# Enable ssl engine
+SSLEngine on
+
+# Some ssl options
+SSLProtocol ALL -SSLv2 -SSLv3
+SSLCipherSuite "EECDH+ECDSA+AESGCM EECDH+aRSA+AESGCM EECDH+ECDSA+SHA384 EECDH+ECDSA+SHA256 EECDH+aRSA+SHA384 EECDH+aRSA+SHA256 EECDH+aRSA+RC4 EECDH EDH+aRSA RC4 !aNULL !eNULL !LOW !3DES !MD5 !EXP !PSK !SRP !DSS !RC4"
+SSLHonorCipherOrder On
+SSLCompression Off
+SSLInsecureRenegotiation Off
+
+EndOfMessage
+
+
+# -----------------------------------------------------------
+#
+# SSL: apache include ssl content
 #
 # -----------------------------------------------------------
 read -d '' TEMPLATE_APACHE_INCLUDES_SSL <<EndOfMessage
-%s
-
-#
 # SSL settings
-#
-SSLEngine               on
 SSLCertificateFile      /etc/dehydrated/certs/%s/fullchain.pem
 SSLCertificateKeyFile   /etc/dehydrated/certs/%s/privkey.pem
+
+EndOfMessage
+
+
+# -----------------------------------------------------------
+#
+# SSL: apache include ssl content (after)
+#
+# -----------------------------------------------------------
+read -d '' TEMPLATE_APACHE_INCLUDES_SSL_AFTER <<EndOfMessage
+# HSTS Header
+Header add Strict-Transport-Security "max-age=15724800"
+
+# Enable OCSP Stapling
+SSLUseStapling                   on
+SSLStaplingResponderTimeout      5
+SSLStaplingReturnResponderErrors off
+
 EndOfMessage
 
 # -----------------------------------------------------------

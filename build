@@ -157,6 +157,11 @@ if $buildConfigFiles; then
         # ssl redirect
         sslRedirect=$(printf "\n\n$TEMPLATE_APACHE_INCLUDES_GENERAL_SSL_REDIRECT")
 
+        # ssl config
+         sslConfig=$(printf "$TEMPLATE_APACHE_INCLUDES_SSL_BEFORE" "$disclaimer")
+        sslConfig+=$'\n'$'\n'$(printf "$TEMPLATE_APACHE_INCLUDES_SSL" "$name" "$name")
+        sslConfig+=$'\n'$'\n'$(printf "$TEMPLATE_APACHE_INCLUDES_SSL_AFTER")
+
         # fill include files
         printf \
             "$TEMPLATE_APACHE_INCLUDES_GENERAL" \
@@ -170,7 +175,7 @@ if $buildConfigFiles; then
             "$port" \
             "$apacheAuthentication" \
             "$apacheAuthentication" > "$fileGeneral"
-        printf "$TEMPLATE_APACHE_INCLUDES_SSL" "$disclaimer" "$name" "$name" > "$fileSsl"
+        echo "$sslConfig" > "$fileSsl"
 
         log 'info' "File was created: $fileGeneral"
         log 'info' "File was created: $fileSsl"
