@@ -1,0 +1,15 @@
+#
+# This is only an example. Please put your config at /etc/reverse-proxy/virtualHosts.
+#
+
+# --------------------------
+# www.ixno.de
+# --------------------------
+www.domain.de {
+    port=8080
+    aliases=()
+    inversedName=de.domain.www
+    username=
+    password=
+}
+

@@ -1,0 +1,235 @@
+#!/bin/bash
+
+# --------------------
+# 0a) Config variables
+# --------------------
+
+# some configs
+           enableHttps=true
+     installDehydrated=true
+      buildConfigFiles=true
+       restartServices=true
+
+# some configs
+              pathRoot="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+       fileConfigPages='config/pages'
+fileConfigVirtualHosts='/etc/reverse-proxy/virtualHosts'
+          httpProtocol='http://'
+         httpsProtocol='https://'
+           currentDate=$(date "+%y-%m-%d %H:%M:%S")
+        repoDehydrated='https://github.com/lukas2511/dehydrated.git'
+ fullchainPathTemplate='/etc/dehydrated/certs/%s/fullchain.pem'
+
+
+
+# ----------------
+# 0b) Preparations
+# ----------------
+
+# include some libraries, templates & configs
+source "$pathRoot/lib/functions"
+source "$pathRoot/templates/apache"
+source "$pathRoot/config/paths"
+
+# check for root
+userId=`id -u`
+if [[ $userId -ne 0 ]]; then
+  log 'error' "Please run this script as root. sudo $0 ..." && exit 1
+fi
+log 'info' 'This script is executed as root. Perfect.'
+
+# check config file
+if [ ! -f "$fileConfigVirtualHosts" ]; then
+  log 'error' "Config file \"$fileConfigVirtualHosts\" was not found. Please check." && exit 1
+fi
+
+# read config file
+log 'info' "Parse config file \"$fileConfigVirtualHosts\"."
+cfgParser "$fileConfigVirtualHosts" 'virtualhost'
+log 'info' 'Config file parsed. Perfect.'
+
+# build disclaimer
+disclaimer=$(printf "$TEMPLATE_DISCLAIMER" "$currentDate")
+
+
+
+# ---------------------
+# 1) Install dehydrated
+# ---------------------
+
+if $installDehydrated; then
+    # check some folders
+    createFolderIfNotExists "$FOLDER_CONFIG_DEHYDRATED" || exit 1
+    createFolderIfNotExists "$FOLDER_DEHYDRATED"        || exit 1
+    createFolderIfNotExists "$FOLDER_WWW_DEHYDRATED"    || exit 1
+
+    # check that $FOLDER_DEHYDRATED is checked out
+    gitCheckoutIfNotExists "$repoDehydrated" "$FOLDER_DEHYDRATED" || exit 1
+
+    # create symlink
+    createSymlinkIfNotExists "$FILE_SRC_DEHYDRATED" "$SYMLINK_DEHYDRATED" || exit 1
+
+    # copy config
+    copyFileIfNotExits "$FILE_EXAMPLE_CONFIG_DEHYDRATED" "$FILE_CONFIG_DEHYDRATED" || exit 1
+else
+    log 'warning' "Installation of dehydrated skipped by config."
+fi
+
+
+
+# -------------------------
+# 2) build the config files
+# -------------------------
+
+if $buildConfigFiles; then
+
+    # create sites-available path
+    log 'info' "Create sites-available path \"$PATH_APACHE_SITES_AVAILABLE\"."
+    mkdir -p "$PATH_APACHE_SITES_AVAILABLE"
+
+    # creates includes path
+    log 'info' "Create includes path \"$PATH_APACHE_SITES_AVAILABLE\"."
+    mkdir -p "$PATH_APACHE_INCLUDES"
+
+    # create authentication path
+    log 'info' "Create authentication path \"$PATH_APACHE_AUTHENTICATION\"."
+    mkdir -p "$PATH_APACHE_AUTHENTICATION"
+
+    # create include log file
+    log 'info' "Create log file \"$FILE_APACHE_INCLUDES_LOG\"."
+    printf "$TEMPLATE_APACHE_INCLUDES_LOG" "$disclaimer" > "$FILE_APACHE_INCLUDES_LOG"
+
+    # create site-available files
+    log 'info' "Create http sites-available file \"$FILE_APACHE_SITES_AVAILABLE_HTTP\"."
+    printf "" > $FILE_APACHE_SITES_AVAILABLE_HTTP
+    log 'info' "Create https sites-available_file \"$FILE_APACHE_SITES_AVAILABLE_HTTPS\"."
+    printf "" > $FILE_APACHE_SITES_AVAILABLE_HTTPS
+
+    # empty domains file
+    echo -n "" > "$DOMAINS_FILE"
+
+    # build the apache files
+    for virtualhost in "${virtualhosts[@]}"; do
+        # provide $port, $inversedName and $aliases
+        virtualhost.$virtualhost
+
+        # set some variables
+                            name="$virtualhost"
+                   fullchainPath=$(printf "$fullchainPathTemplate" "$name")
+        domainListSpaceSeparated="$virtualhost"
+
+        # check ssl certificate
+        if $ssl && [ ! -f "$fullchainPath" ]; then
+            log 'warning' "SSL certificate \"$fullchainPath\" not found for \"$name\"."
+            ssl=false
+        fi
+
+        # domain driven "general" & "ssl" file (include files)
+        fileGeneral=$(printf "$FILE_APACHE_INCLUDES_GENERAL" "$inversedName")
+            fileSsl=$(printf "$FILE_APACHE_INCLUDES_SSL"     "$inversedName")
+
+        # http(s) domain list
+         httpDomainList="$httpProtocol$name"
+        httpsDomainList="$httpsProtocol$name"
+
+        # other files
+        apacheAuthentication="$PATH_APACHE_AUTHENTICATION/$inversedName"
+
+        # build alias command
+         aliasCommand=""
+        aliasRedirect=""
+        for alias in "${aliases[@]}"; do
+                         aliasCommand=$(printf "%s\n$TEMPLATE_APACHE_INCLUDES_GENERAL_ALIAS" "$aliasCommand" "$alias")
+                       httpDomainList="$httpDomainList"$'\n'"# $httpProtocol$alias"
+                      httpsDomainList="$httpsDomainList"$'\n'"# $httpsProtocol$alias"
+            domainListSpaceSeparated+=" $alias"
+                       aliasRedirect+=$(printf "\n\n$TEMPLATE_APACHE_INCLUDES_GENERAL_ALIAS_REDIRECT" "$alias" "$name" "$alias" "$name")
+        done
+
+        log 'info' "Create files for \"$name\"."
+
+        # create authentication file
+        if [ "$username" != "" ]; then
+            log 'info' "Create passwd file \"$PATH_APACHE_AUTHENTICATION/$inversedName\"."
+            return=$(htpasswd -cb "$PATH_APACHE_AUTHENTICATION/$inversedName" "$username" "$password" 2>&1)
+        fi
+
+        # ssl redirect
+        sslRedirect=$(printf "\n\n$TEMPLATE_APACHE_INCLUDES_GENERAL_SSL_REDIRECT")
+
+        # fill include files
+        printf \
+            "$TEMPLATE_APACHE_INCLUDES_GENERAL" \
+            "$disclaimer" \
+            "$name" \
+            "$aliasCommand" \
+            "$sslRedirect" \
+            "$aliasRedirect" \
+            "$port" \
+            "$port" \
+            "$port" \
+            "$apacheAuthentication" \
+            "$apacheAuthentication" > "$fileGeneral"
+        printf "$TEMPLATE_APACHE_INCLUDES_SSL" "$disclaimer" "$name" "$name" > "$fileSsl"
+
+        log 'info' "File was created: $fileGeneral"
+        log 'info' "File was created: $fileSsl"
+
+        # fill sites-available files (http)
+        printf "$TEMPLATE_APACHE_SITES_AVAILABLE_HTTP"  "$httpDomainList"  "$inversedName" >> "$FILE_APACHE_SITES_AVAILABLE_HTTP"
+        printf "\n\n"                                                                      >> "$FILE_APACHE_SITES_AVAILABLE_HTTP"
+
+        # fill sites-available files (https)
+        if $ssl; then
+            printf "$TEMPLATE_APACHE_SITES_AVAILABLE_HTTPS" "$httpsDomainList" "$inversedName" "$inversedName" >> "$FILE_APACHE_SITES_AVAILABLE_HTTPS"
+            printf "\n\n"                                                                                      >> "$FILE_APACHE_SITES_AVAILABLE_HTTPS"
+        else
+            log 'info' "Skip https for \"$name\"."
+        fi
+
+        log 'info' "File was updated: $FILE_APACHE_SITES_AVAILABLE_HTTP"
+        log 'info' "File was updated: $FILE_APACHE_SITES_AVAILABLE_HTTPS"
+
+        # add domain to domains file
+        echo "$domainListSpaceSeparated > $name" >> "$DOMAINS_FILE"
+
+        log 'info' "File was updated: $DOMAINS_FILE"
+  done
+  log 'info' 'Finished building the apache files.'
+
+else
+  log 'warning' "Building the config files skipped by config."
+fi
+
+
+
+# -----------------------
+# 3) Restart all services
+# -----------------------
+
+if $restartServices; then
+
+    # disable https, enable http
+    a2dissite 000-default
+    if $enableHttps; then
+        a2ensite https
+    else
+        a2dissite https
+    fi
+    a2ensite http
+
+    # restart apache
+    service apache2 reload
+
+    # create certificates
+    if $enableHttps; then
+      dehydrated -c
+    fi
+
+    # restart apache
+    service apache2 restart
+
+else
+  log 'warning' "Restart the services skipped by config."
+fi
+

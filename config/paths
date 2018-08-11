@@ -1,0 +1,26 @@
+# some path variables dehydrated
+      FOLDER_CONFIG_DEHYDRATED='/etc/dehydrated'
+             FOLDER_DEHYDRATED='/opt/dehydrated'
+         FOLDER_WWW_DEHYDRATED='/var/www/dehydrated'
+            SYMLINK_DEHYDRATED='/usr/local/sbin/dehydrated'
+                  DOMAINS_FILE="$FOLDER_CONFIG_DEHYDRATED/domains.txt"
+	
+        FILE_CONFIG_DEHYDRATED="$FOLDER_CONFIG_DEHYDRATED/config"
+           FILE_SRC_DEHYDRATED="$FOLDER_DEHYDRATED/dehydrated"
+FILE_EXAMPLE_CONFIG_DEHYDRATED="$FOLDER_DEHYDRATED/docs/examples/config"
+ 
+ 
+ 
+# some path variables apache
+                        PATH_ROOT=''
+                      PATH_APACHE=$PATH_ROOT'/etc/apache2'
+      PATH_APACHE_SITES_AVAILABLE=$PATH_APACHE'/sites-available'
+             PATH_APACHE_INCLUDES=$PATH_APACHE'/includes'
+       PATH_APACHE_AUTHENTICATION=$PATH_APACHE'/authentication'
+ 
+ FILE_APACHE_SITES_AVAILABLE_HTTP=$PATH_APACHE_SITES_AVAILABLE'/http.conf'
+FILE_APACHE_SITES_AVAILABLE_HTTPS=$PATH_APACHE_SITES_AVAILABLE'/https.conf'
+     FILE_APACHE_INCLUDES_GENERAL=$PATH_APACHE_INCLUDES'/%s.general'
+         FILE_APACHE_INCLUDES_SSL=$PATH_APACHE_INCLUDES'/%s.ssl'
+         FILE_APACHE_INCLUDES_LOG=$PATH_APACHE_INCLUDES'/log'
+
